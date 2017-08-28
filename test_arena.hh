@@ -197,7 +197,8 @@ public:
   typedef boost::asio::io_service io_service;
 
   TestArena()
-    : _overall(new Summary()) {
+    : _overall(new Summary())
+    , _interrupted(false) {
   }
 
   boost::shared_ptr<Summary> GetSummary(const std::string& url) {
@@ -266,6 +267,9 @@ public:
       return;
     }
 
+    boost::asio::signal_set signals(_ioServ, SIGINT, SIGTERM);
+    signals.async_wait(boost::bind(&TestArena::SignalHandler, this));
+
     boost::shared_ptr<io_service::work> workKeeper(
       new io_service::work(_ioServ));
     boost::thread workThread(boost::bind(&io_service::run, &_ioServ));
@@ -276,7 +280,7 @@ public:
     boost::chrono::time_point<boost::chrono::high_resolution_clock> start
       = boost::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < connects; ) {
+    for (int i = 0; i < connects && !_interrupted; ) {
       boost::chrono::microseconds elapsed =
         boost::chrono::duration_cast<boost::chrono::microseconds>(
           boost::chrono::high_resolution_clock::now() - start);
@@ -285,8 +289,7 @@ public:
         usleep(naptime);
       } else {
         std::string url = _cfg.GetNextURL(it++);
-        boost::shared_ptr<PlaySession> sess(CreateSession(url));
-        _sessions.push_back(sess);
+        CreateSession(url);
         i++;
       }
     }
@@ -322,6 +325,12 @@ public:
   }
 
 protected:
+
+  void SignalHandler() {
+    std::cout << "\nInterrupting test loop\n";
+    _ioServ.stop();
+    _interrupted = true;
+  }
 
   static bool IsForbidden(char c) {
     static std::string forbiddenChars("\\/:?\"<>|");
@@ -377,11 +386,11 @@ protected:
   }
 
 private:
-  std::list<boost::shared_ptr<PlaySession> > _sessions;
   boost::shared_ptr<Summary> _overall;
   boost::unordered_map<std::string, boost::shared_ptr<Summary> > _sums;
   io_service _ioServ;
   TestConfig _cfg;
+  bool _interrupted;
 };
 
 #endif // TEST_ARENA_HH_INCLUDED
