@@ -11,15 +11,10 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  boost::shared_ptr<SessionSum> sumup(new SessionSum());
-  TestArena arena(sumup);
+  TestArena arena;
   arena.SetConfig(cfg);
   arena.Run();
-
-  sumup->PrintSummary();
-  if (cfg.Detailed()) {
-    sumup->WriteToCSV();
-  }
+  arena.PrintResult();
 
   return 0;
 }

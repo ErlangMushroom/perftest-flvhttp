@@ -3,7 +3,9 @@
 
 #include <string>
 #include <stdint.h>
+#include <boost/smart_ptr.hpp>
 
+class Summary;
 struct PlaySession {
   enum ErrorCode {
     HTTP_ERROR_BASE = 0x0000,
@@ -24,6 +26,7 @@ struct PlaySession {
   virtual ~PlaySession() {}
   virtual void Disconnect() = 0;
   virtual std::string GetPlayURL() const = 0;
+  virtual const boost::shared_ptr<Summary>& GetSummary() const = 0;
 };
 
 #endif // PLAYSESSION_HH_INCLUDED

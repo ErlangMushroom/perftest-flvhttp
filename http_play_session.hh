@@ -32,12 +32,14 @@ public:
 
   HTTPPlaySession(Observable* obs,
                   boost::asio::io_service& ioServ,
+                  const boost::shared_ptr<Summary>& sum,
                   const urdl::url& url,
                   int32_t timeout)
       : _observer(obs)
       , _resolver(ioServ)
       , _socket(ioServ)
       , _timer(ioServ)
+      , _sum(sum)
       , _contentBytes(0)
       , _statsBytes(0)
       , _timeout(timeout)
@@ -86,6 +88,10 @@ public:
 
   virtual std::string GetPlayURL() const {
     return _url;
+  }
+
+  const boost::shared_ptr<Summary>& GetSummary() const {
+    return _sum;
   }
 
 protected:
@@ -305,6 +311,7 @@ protected:
 
 private:
   Observable* _observer;
+  boost::shared_ptr<Summary> _sum;
   tcp::resolver _resolver;
   tcp::socket _socket;
   boost::asio::deadline_timer _timer;
