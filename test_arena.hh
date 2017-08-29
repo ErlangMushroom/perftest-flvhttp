@@ -1,7 +1,6 @@
 #ifndef TEST_ARENA_HH_INCLUDED
 #define TEST_ARENA_HH_INCLUDED
 
-#include <list>
 #include <memory>
 #include <sstream>
 #include <boost/thread/thread.hpp>
@@ -244,11 +243,19 @@ public:
                             size_t totalbytes) {
     if (totalbytes >= _cfg.MaxRecvLength()) {
       sess->Disconnect();
+      if (--_clients == 0) {
+        _ioServ.stop();
+      }
     }
   }
 
   virtual void OnFinished(PlaySession* sess) {
+    sess->GetSummary()->UpdateError(HTTPPlaySession::ERROR_EARLY_EOF);
+    _overall->UpdateError(HTTPPlaySession::ERROR_EARLY_EOF);
     sess->Disconnect();
+    if (--_clients == 0) {
+      _ioServ.stop();
+    }
   }
 
   virtual void OnError(PlaySession* sess,
@@ -256,6 +263,9 @@ public:
     sess->GetSummary()->UpdateError(ec);
     _overall->UpdateError(ec);
     sess->Disconnect();
+    if (--_clients == 0) {
+      _ioServ.stop();
+    }
   }
 
   void SetConfig(const TestConfig& cfg) {
@@ -276,6 +286,7 @@ public:
 
     int interval = _cfg.Interval();
     int connects = _cfg.Clients();
+    _clients = connects;
     TestConfig::URLIterator it = _cfg.GetURLIterator();
     boost::chrono::time_point<boost::chrono::high_resolution_clock> start
       = boost::chrono::high_resolution_clock::now();
@@ -362,14 +373,15 @@ protected:
       << sum->_kBytesPerSec.Value() << "/"
       << sum->_kBytesPerSec.Max() << "/"
       << sum->_kBytesPerSec.Min() << " (KB/s)"
-    << "  err (resolve/connect/request/recv/bad_http/timeout): "
+    << "  err (resolve/connect/request/recv/bad_http/timeout/early_eof): "
 #define ERRORCOUNT(x) sum->_errors[(x) - HTTPPlaySession::ERROR_BASE]
       << ERRORCOUNT(HTTPPlaySession::ERROR_ON_RESOLVE) << "/"
       << ERRORCOUNT(HTTPPlaySession::ERROR_ON_CONNECT) << "/"
       << ERRORCOUNT(HTTPPlaySession::ERROR_ON_REQUEST) << "/"
       << ERRORCOUNT(HTTPPlaySession::ERROR_ON_RECV) << "/"
       << ERRORCOUNT(HTTPPlaySession::ERROR_BAD_HTTP) << "/"
-      << ERRORCOUNT(HTTPPlaySession::ERROR_TIMEOUT_FOR_NO_DATA)
+      << ERRORCOUNT(HTTPPlaySession::ERROR_TIMEOUT_FOR_NO_DATA) << "/"
+      << ERRORCOUNT(HTTPPlaySession::ERROR_EARLY_EOF)
 #undef ERRORCOUNT
     << std::endl;
   }
@@ -391,6 +403,7 @@ private:
   io_service _ioServ;
   TestConfig _cfg;
   bool _interrupted;
+  int _clients;
 };
 
 #endif // TEST_ARENA_HH_INCLUDED

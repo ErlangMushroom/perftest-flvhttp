@@ -27,6 +27,7 @@ public:
     ERROR_ON_RECV,
     ERROR_BAD_HTTP,
     ERROR_TIMEOUT_FOR_NO_DATA,
+    ERROR_EARLY_EOF,
     ERROR_MAX
   };
 
@@ -78,9 +79,6 @@ public:
 
   virtual void Disconnect() {
     if (_socket.is_open()) {
-      //_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-      //boost::asio::socket_base::linger option(true, 0);
-      //_socket.set_option(option);
       _socket.close();
     }
     _timer.cancel();
@@ -109,7 +107,7 @@ protected:
       _socket.async_connect(endpoint,
         boost::bind(&HTTPPlaySession::HandleConnect, this,
           boost::asio::placeholders::error, ++endpoint_iterator));
-    } else {
+    } else if (_socket.is_open()) {
       _observer->OnError(this, ERROR_ON_RESOLVE);
     }
   }
@@ -126,7 +124,7 @@ protected:
         boost::bind(&HTTPPlaySession::HandleRequest, this,
           boost::asio::placeholders::error));
 
-    } else {
+    } else if (_socket.is_open()) {
       _observer->OnError(this, ERROR_ON_CONNECT);
     }
   }
@@ -151,7 +149,7 @@ protected:
         boost::bind(&HTTPPlaySession::HandleConnect, this,
           boost::asio::placeholders::error, ++endpoint_iterator));
 
-    } else {
+    } else if (_socket.is_open()) {
       _observer->OnError(this, ERROR_ON_CONNECT);
     }
   }
@@ -225,7 +223,7 @@ protected:
       _checkPoint = boost::chrono::system_clock::now();
 
       boost::asio::async_read(_socket, _response,
-        boost::asio::transfer_exactly(RECV_BLOCK_SIZE),
+        boost::asio::transfer_at_least(RECV_BLOCK_SIZE),
         boost::bind(&HTTPPlaySession::HandleContent, this,
           boost::asio::placeholders::error));
 
@@ -264,7 +262,7 @@ protected:
       _observer->OnTotalBytes(this, _contentBytes);
 
       boost::asio::async_read(_socket, _response,
-        boost::asio::transfer_exactly(RECV_BLOCK_SIZE),
+        boost::asio::transfer_at_least(RECV_BLOCK_SIZE),
         boost::bind(&HTTPPlaySession::HandleContent, this,
           boost::asio::placeholders::error));
 
